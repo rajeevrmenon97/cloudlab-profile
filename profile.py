@@ -13,7 +13,7 @@ import geni.rspec.pg as pg
 # Emulab specific extensions.
 import geni.rspec.emulab as emulab
 
-IMAGE='urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-STD'
+IMAGE='urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU20-64-STD'
 
 # Create a portal context, needed to defined parameters
 pc = portal.Context()
