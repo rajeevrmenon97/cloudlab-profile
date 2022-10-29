@@ -21,7 +21,7 @@ pc = portal.Context()
 # Create a Request object to start building the RSpec.
 request = pc.makeRequestRSpec()
 
-node = request.RawPC(name)
+node = request.RawPC("node0")
 node.disk_image = IMAGE
 node.hardware_type = "m510"
 
