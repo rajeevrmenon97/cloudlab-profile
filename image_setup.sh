@@ -23,7 +23,7 @@ sudo docker run hello-world | grep "Hello from Docker!" || (echo "ERROR: Docker 
 # Install Kubernetes
 sudo apt install -y apt-transport-https curl
 sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
-sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+sudo apt-add-repository -y "deb http://apt.kubernetes.io/ kubernetes-xenial main"
 sudo apt install -y kubeadm kubelet kubectl kubernetes-cni
 
 # Prepare kubelet to use private cloudlab IP address
