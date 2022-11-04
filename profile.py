@@ -1,9 +1,10 @@
 
 """
-WIP profile, using for now just to set up image.
+CloudLab profile to set up a Kubernetes cluster with flannel CNI and multus CNI plugin installed. Each node runs Ubuntu 20.04.
 
 Instructions:
-Under development, do not use.
+Create the experiment in CloudLab. Wait until the start script completes (can see status in the CloudLab experiment page). Interact with the cluster
+using kubectl on node1 (the control-plane node). If something goes wrong, check the logs found in /home/k8s-flannel.
 """
 
 import time
@@ -15,7 +16,7 @@ import geni.rspec.pg as rspec
 
 BASE_IP = "10.10.1"
 BANDWIDTH = 10000000
-IMAGE = 'urn:publicid:IDN+utah.cloudlab.us+image+cuadvnetfall2022-PG0:k8s-flannel'
+IMAGE = 'urn:publicid:IDN+utah.cloudlab.us+image+cuadvnetfall2022-PG0:k8s-flannel:1'
 
 # Set up parameters
 pc = portal.Context()

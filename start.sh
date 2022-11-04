@@ -16,8 +16,14 @@ configure_docker_storage() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Configuring docker storage"
     sudo mkdir /mydata/docker
     echo -e '{
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+            "max-size": "100m"
+        },
+        "storage-driver": "overlay2",
         "data-root": "/mydata/docker"
-}' | sudo tee /etc/docker/daemon.json
+    }' | sudo tee /etc/docker/daemon.json
     sudo systemctl restart docker || (echo "ERROR: Docker installation failed, exiting." && exit -1)
     sudo docker run hello-world | grep "Hello from Docker!" || (echo "ERROR: Docker installation failed, exiting." && exit -1)
     printf "%s: %s\n" "$(date +"%T.%N")" "Configured docker storage to use mountpoint"
@@ -90,35 +96,27 @@ setup_primary() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
 
-apply_calico() {
-    # https://projectcalico.docs.tigera.io/getting-started/kubernetes/helm
-    helm repo add projectcalico https://projectcalico.docs.tigera.io/charts > $INSTALL_DIR/calico_install.log 2>&1 
+apply_flannel() {
+    kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml >> $INSTALL_DIR/flannel_install.log 2>&1
     if [ $? -ne 0 ]; then
-       echo "***Error: Error when loading helm calico repo. Log written to $INSTALL_DIR/calico_install.log"
+       echo "***Error: Error when installing flannel. Logs in $INSTALL_DIR/flannel_install.log"
        exit 1
     fi
-    printf "%s: %s\n" "$(date +"%T.%N")" "Loaded helm calico repo"
+    printf "%s: %s\n" "$(date +"%T.%N")" "Applied Flannel networking"
 
-    helm install calico projectcalico/tigera-operator --version v3.22.0 >> $INSTALL_DIR/calico_install.log 2>&1
-    if [ $? -ne 0 ]; then
-       echo "***Error: Error when installing calico with helm. Log appended to $INSTALL_DIR/calico_install.log"
-       exit 1
-    fi
-    printf "%s: %s\n" "$(date +"%T.%N")" "Applied Calico networking with helm"
-
-    # wait for calico pods to be in ready state
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for calico pods to have status of 'Running': "
-    NUM_PODS=$(kubectl get pods -n calico-system | wc -l)
-    NUM_RUNNING=$(kubectl get pods -n calico-system | grep " Running" | wc -l)
+    # wait for flannel pods to be in ready state
+    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for flannel pods to have status of 'Running': "
+    NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
+    NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
     NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
     while [ "$NUM_RUNNING" -ne 0 ]
     do
         sleep 1
         printf "."
-        NUM_RUNNING=$(kubectl get pods -n calico-system | grep " Running" | wc -l)
+        NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
         NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
     done
-    printf "%s: %s\n" "$(date +"%T.%N")" "Calico pods running!"
+    printf "%s: %s\n" "$(date +"%T.%N")" "Flannel pods running!"
     
     # wait for kube-system pods to be in ready state
     printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all system pods to have status of 'Running': "
@@ -171,6 +169,33 @@ add_cluster_nodes() {
     done
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
+
+apply_multus() {
+    cd $INSTALL_DIR
+    git clone https://github.com/k8snetworkplumbingwg/multus-cni.git
+    cd multus-cni
+    cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f - >> $INSTALL_DIR/multus_install.log 2>&1
+    if [ $? -ne 0 ]; then
+       echo "***Error: Error when installing multus. Logs in $INSTALL_DIR/multus_install.log"
+       exit 1
+    fi
+    printf "%s: %s\n" "$(date +"%T.%N")" "Applied multus CNI plugin"
+
+    # wait for multus pods to be in ready state
+    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for flannel pods to have status of 'Running': "
+    NUM_PODS=$(kubectl get pods -n kube-system | grep multus | wc -l)
+    NUM_RUNNING=$(kubectl get pods -n kube-system | grep multus | grep " Running" | wc -l)
+    NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
+    while [ "$NUM_RUNNING" -ne 0 ]
+    do
+        sleep 1
+        printf "."
+        NUM_RUNNING=$(kubectl get pods -n kube-system | grep multus | grep " Running" | wc -l)
+        NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
+    done
+    printf "%s: %s\n" "$(date +"%T.%N")" "Multus pods running!"
+}
+
 
 # Start by recording the arguments
 printf "%s: args=(" "$(date +"%T.%N")"
@@ -226,7 +251,7 @@ if [ $1 == $SECONDARY_ARG ] ; then
     # Use second argument (node IP) to replace filler in kubeadm configuration
     sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
-    # setup_secondary $2
+    setup_secondary $2
     exit 0
 fi
 
@@ -250,11 +275,11 @@ sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.
 # Argument is node_ip
 setup_primary $2
 
-# TODO: exit early for now
-exit 0
+# Apply flannel networking
+apply_flannel
 
-# Apply calico networking
-apply_calico
+# Install multus CNI plugin
+apply_multus
 
 # Coordinate master to add nodes to the kubernetes cluster
 # Argument is number of nodes
