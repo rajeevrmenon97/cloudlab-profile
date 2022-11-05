@@ -5,6 +5,7 @@ BASE_IP="10.10.1."
 SECONDARY_PORT=3000
 INSTALL_DIR=/home/k8s-flannel
 PROFILE_GROUP="k8suser"
+MULTUS_COMMIT="77e0150"
 
 NUM_MIN_ARGS=3
 NUM_PRIMARY_ARGS=4
@@ -171,9 +172,16 @@ add_cluster_nodes() {
 }
 
 apply_multus() {
+    # Checkout multus directory. Always use same commit for stable environment
     cd $INSTALL_DIR
     git clone https://github.com/k8snetworkplumbingwg/multus-cni.git
     cd multus-cni
+    git checkout $MULTUS_COMMIT
+    
+    # Enable namespace isolation
+    sudo sed -i '186 i \        - "--namespace-isolation=true"' multus-daemonset.yml
+    
+    # Install multus
     cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f - >> $INSTALL_DIR/multus_install.log 2>&1
     if [ $? -ne 0 ]; then
        echo "***Error: Error when installing multus. Logs in $INSTALL_DIR/multus_install.log"
