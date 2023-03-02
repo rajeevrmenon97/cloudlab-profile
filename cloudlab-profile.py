@@ -1,6 +1,6 @@
 
 """
-CloudLab profile to set up a Kubernetes cluster with flannel CNI and multus CNI plugin installed. Each node runs Ubuntu 20.04.
+CloudLab profile to set up nodes running Ubuntu 20.04.
 
 Instructions:
 Create the experiment in CloudLab. Wait until the start script completes (can see status in the CloudLab experiment page). Interact with the cluster
@@ -16,25 +16,25 @@ import geni.rspec.pg as rspec
 
 BASE_IP = "10.10.1"
 BANDWIDTH = 10000000
-IMAGE = 'urn:publicid:IDN+utah.cloudlab.us+image+cuadvnetfall2022-PG0:k8s-flannel:1'
+IMAGE = 'urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU20-64-STD'
 
 # Set up parameters
 pc = portal.Context()
 pc.defineParameter("nodeCount", 
-                   "Number of nodes in the experiment. It is recommended that at least 3 be used.",
+                   "Number of nodes in the experiment.",
                    portal.ParameterType.INTEGER, 
-                   3)
+                   2)
 pc.defineParameter("nodeType", 
                    "Node Hardware Type",
                    portal.ParameterType.NODETYPE, 
                    "m510",
-                   longDescription="A specific hardware type to use for all nodes. This profile has primarily been tested with m510 and xl170 nodes.")
-pc.defineParameter("startKubernetes",
+                   longDescription="A specific hardware type to use for all nodes. This profile has primarily been tested for x86 nodes.")
+pc.defineParameter("setupKubernetes",
                    "Create Kubernetes cluster",
                    portal.ParameterType.BOOLEAN,
-                   True,
-                   longDescription="Create a Kubernetes cluster using default image setup (calico networking, etc.)")
-# Below option copy/pasted directly from small-lan experiment on CloudLab
+                   False,
+                   longDescription="Create a Kubernetes cluster")
+
 # Optional ephemeral blockstore
 pc.defineParameter("tempFileSystemSize", 
                    "Temporary Filesystem Size",
@@ -81,13 +81,17 @@ for i in range(params.nodeCount):
     name = "node"+str(i+1)
     create_node(name, nodes, lan)
 
-# Iterate over secondary nodes first
-for i, node in enumerate(nodes[1:]):
-    node.addService(rspec.Execute(shell="bash", command="/local/repository/start.sh secondary {}.{} {} > /home/k8s-flannel/start.log 2>&1 &".format(
-      BASE_IP, i + 2, params.startKubernetes)))
+if params.setupKubernetes:
+   for i, node in enumerate(nodes):
+    node.addService(rspec.Execute(shell="bash", command="/local/repository/k8s-setup.sh > /tmp/k8s-setup.log 2>&1"))
 
-# Start primary node
-nodes[0].addService(rspec.Execute(shell="bash", command="/local/repository/start.sh primary {}.1 {} {} > /home/k8s-flannel/start.log 2>&1".format(
-  BASE_IP, params.nodeCount, params.startKubernetes)))
+# # Iterate over secondary nodes first
+# for i, node in enumerate(nodes[1:]):
+#     node.addService(rspec.Execute(shell="bash", command="/local/repository/start.sh secondary {}.{} {} > /home/k8s-flannel/start.log 2>&1 &".format(
+#       BASE_IP, i + 2, params.setupKubernetes)))
+
+# # Start primary node
+# nodes[0].addService(rspec.Execute(shell="bash", command="/local/repository/start.sh primary {}.1 {} {} > /home/k8s-flannel/start.log 2>&1".format(
+#   BASE_IP, params.nodeCount, params.setupKubernetes)))
 
 pc.printRequestRSpec()

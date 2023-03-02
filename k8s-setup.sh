@@ -8,12 +8,8 @@ set -x
 DOCKER_VERSION_STRING=5:20.10.12~3-0~ubuntu-focal
 KUBERNETES_VERSION_STRING=1.23.3-00
 
-# Unlike home directories, this directory will be included in the image
-USER_GROUP=k8s-flannel
-INSTALL_DIR=/home/k8s-flannel
-
 # General updates
-sudo apt update
+sudo apt update -y
 sudo apt upgrade -y
 sudo apt autoremove -y
 
@@ -54,9 +50,3 @@ sudo apt install -y kubelet=$KUBERNETES_VERSION_STRING kubeadm=$KUBERNETES_VERSI
 
 # Set to use private IP
 sudo sed -i.bak "s/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml --node-ip=REPLACE_ME_WITH_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-
-# Create $USER_GROUP group so $INSTALL_DIR can be accessible to everyone
-sudo groupadd $USER_GROUP
-sudo mkdir $INSTALL_DIR
-sudo chgrp -R $USER_GROUP $INSTALL_DIR
-sudo chmod -R o+rw $INSTALL_DIR
