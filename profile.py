@@ -1,10 +1,6 @@
 
 """
 CloudLab profile to set up nodes running Ubuntu 20.04.
-
-Instructions:
-Create the experiment in CloudLab. Wait until the start script completes (can see status in the CloudLab experiment page). Interact with the cluster
-using kubectl on node1 (the control-plane node). If something goes wrong, check the logs found in /home/k8s-flannel.
 """
 
 import time
